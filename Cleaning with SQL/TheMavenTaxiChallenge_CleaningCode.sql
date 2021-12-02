@@ -13,12 +13,6 @@ WHERE
 	AND "PULocationID"  < 264 -- removes trips with pick up from an unknown zone
 	AND "DOLocationID" < 264 – removes trips with drop of in an unknown zone
 
-
-
-
-
-
-
 -- Changing passenger count from 0 to 1
 
 UPDATE public.temp1_total_taxi_trips
@@ -65,9 +59,8 @@ UPDATE public.temp1_total_taxi_trips
 SET trip_distance = (fare_amount - 2.5) / 2.5
 WHERE fare_amount > 0 AND trip_distance = 0
 
--- Verifying if change was implemented successfully 
-SELECT count(*)
-FROM public.temp1_total_taxi_trips
-WHERE fare_amount > 0 AND  trip_distance = 0
-
+-- Calculating fare amount for trips with distance but have a fare amount of 0		
+UPDATE public.temp1_total_taxi_trips
+SET fare_amount = 2.5 + (trip_distance * 2.5)
+WHERE fare_amount = 0 and trip_distance > 0
 
