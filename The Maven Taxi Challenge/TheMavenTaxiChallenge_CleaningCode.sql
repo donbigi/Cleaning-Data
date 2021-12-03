@@ -1,16 +1,42 @@
+
 --Cleaning The Dataset
--- code used to filter data based  and stores it in a temporary database.
-CREATE TABLE temp1_total_taxi_trips 
-SELECT *
-FROM  public.total_taxi_trips
-WHERE 
-	store_and_fwd_flag = 'N'  -- remove trips that were  sent via ‘store and forward’
-	OR trip_type = 1  -- selects only street-hailed trips
-	OR (payment_type = 1 OR payment_type = 2)  -- only selects trips paid by card or cash
-	OR "RatecodeID" = 1 -- only selects trips with a standard rate
-	OR (EXTRACT(YEAR FROM lpep_pickup_datetime) >= 2017 AND EXTRACT(YEAR FROM lpep_pickup_datetime) <= 2020) – filters data to include only trips between 2017 and 2020
-	OR "PULocationID"  < 264 -- removes trips with pick up from an unknown zone
-	OR "DOLocationID" < 264 – removes trips with drop of in an unknown zone;
+
+-- creating a temp table from the total_taxi_trips table for cleaning
+CREATE TABLE temp_total_taxi_trips AS
+(SELECT *
+FROM  public.total_taxi_trips)
+
+-- removing trips that were sent via ‘store and forward’
+DELETE FROM public.temp_total_taxi_trips
+WHERE store_and_fwd_flag <> 'N'
+
+
+
+
+-- removing trips that were not street hailed, paid by card or cash with a standard rate
+CREATE  TABLE public.temp1_total_taxi_trips AS  -- creates a new table from the temp 1 to store filtered table
+(SELECT * FROM public.temp_total_taxi_trips
+WHERE trip_type = 1  -- selects only street-hailed trips
+AND (payment_type = 1 OR payment_type = 2)  -- only selects trips paid by card or cash
+AND "RatecodeID" = 1) -- only selects trips with a standard rate
+
+--  dropping temp table
+DROP TABLE public.temp_total_taxi_trips
+
+
+-- deleting dates before 2017 or after 2020
+DELETE FROM public.temp1_total_taxi_trips
+WHERE EXTRACT(YEAR FROM lpep_pickup_datetime) < 2017
+OR EXTRACT(YEAR FROM lpep_pickup_datetime) > 2020 
+
+DELETE FROM public.temp1_total_taxi_trips
+WHERE EXTRACT(YEAR FROM lpep_dropoff_datetime) < 2017
+OR EXTRACT(YEAR FROM lpep_dropoff_datetime) > 2020 
+
+-- removes trips with drop of or pickup  in an unknown zone;
+DELETE FROM public.temp1_total_taxi_trips
+WHERE  "PULocationID"  > 263 
+	OR "DOLocationID"  > 263
 
 -- Changing passenger count from 0 to 1
 UPDATE public.temp1_total_taxi_trips
@@ -23,6 +49,10 @@ FROM public.temp1_total_taxi_trips
 ORDER BY passenger_count ASC
 LIMIT 100;
 
+
+
+
+
 -- Swapping date/time where pickup time is after drop off time
 UPDATE public.temp1_total_taxi_trips
    	SET lpep_pickup_datetime = lpep_dropoff_datetime,
@@ -32,7 +62,7 @@ UPDATE public.temp1_total_taxi_trips
 -- Verifying if change was implemented successfully it should read 0
 SELECT count(*)
 FROM public.temp1_total_taxi_trips
- WHERE lpep_pickup_datetime > lpep_dropoff_datetime;
+ WHERE lpep_pickup_datetime > lpep_dropoff_datetime ;
 
 -- removing trips lasting more than a day
 DELETE FROM public.temp1_total_taxi_trips
@@ -57,8 +87,9 @@ UPDATE public.temp1_total_taxi_trips
 SET trip_distance = (fare_amount - 2.5) / 2.5
 WHERE fare_amount > 0 AND trip_distance = 0;
 
--- Calculating fare amount for trips with distance but have a fare amount of 0		
-UPDATE public.temp1_total_taxi_trips
-SET fare_amount = 2.5 + (trip_distance * 2.5)
-WHERE fare_amount = 0 and trip_distance > 0;
+-- Verifying if change was implemented successfully 
+SELECT count(*)
+FROM public.temp1_total_taxi_trips
+WHERE fare_amount > 0 AND  trip_distance = 0;
+
 
